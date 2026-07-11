@@ -4,7 +4,7 @@
   "description": "Post-build SEO validator for Next.js sites — crawls a running site and runs technical SEO checks with a colored terminal report.",
   "type": "module",
   "bin": {
-    "next-seo-doctor": "./dist/index.js"
+    "next-seo-doctor": "dist/index.js"
   },
   "files": [
     "dist"
