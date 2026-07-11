@@ -20,11 +20,26 @@
   "keywords": [
     "seo",
     "nextjs",
+    "next.js",
     "cli",
     "audit",
-    "validator"
+    "validator",
+    "sitemap",
+    "json-ld",
+    "structured-data",
+    "open-graph",
+    "ci"
   ],
+  "author": "Abdelrahman Mostafa",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbdelrahmanMostafa0/next-seo-doctor.git"
+  },
+  "homepage": "https://github.com/AbdelrahmanMostafa0/next-seo-doctor#readme",
+  "bugs": {
+    "url": "https://github.com/AbdelrahmanMostafa0/next-seo-doctor/issues"
+  },
   "dependencies": {
     "cheerio": "^1.0.0",
     "fast-xml-parser": "^4.5.0",
