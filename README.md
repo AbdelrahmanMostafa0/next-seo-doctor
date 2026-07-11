@@ -13,16 +13,22 @@ That's it — no config file, one positional argument. Exit code is `0` when cle
 
 ```sh
 next-seo-doctor <url> [options]
-
-  --max-pages <n>    max pages to crawl (default 200)
-  --concurrency <n>  concurrent page fetches (default 5)
-  --filter <prefix>  only crawl sitemap URLs whose pathname starts with this prefix
-  --only <ids>       comma-separated check IDs; run only these
-  --skip <ids>       comma-separated check IDs; run all except these
-  --json             machine-readable output instead of colored report
-  --version          print version and exit
-  --help             print help and exit
 ```
+
+## Options
+
+| flag | default | description |
+| --- | --- | --- |
+| `--max-pages <n>` | `200` | max pages to crawl |
+| `--concurrency <n>` | `5` | concurrent page fetches |
+| `--filter <prefix>` | — | only crawl sitemap URLs whose pathname starts with this prefix (e.g. `--filter /blog`) |
+| `--only <ids>` | — | comma-separated check IDs; run only these (mutually exclusive with `--skip`) |
+| `--skip <ids>` | — | comma-separated check IDs; run all except these (mutually exclusive with `--only`) |
+| `--json` | off | machine-readable output instead of the colored report |
+| `--version` | — | print version and exit |
+| `--help` | — | print help and exit |
+
+Valid check IDs for `--only`/`--skip`: `canonical`, `sitemap-honesty`, `jsonld-valid`, `jsonld-graph`, `jsonld-xss`, `robots-leak`, `og-image`, `duplicate-canonicals`.
 
 ## The 8 checks
 
