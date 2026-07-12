@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
 import { crawlSite } from "./crawler.js";
 import { renderJsonReport, renderTerminalReport, type ReportData } from "./report.js";
 import { ALL_CHECK_IDS, type CheckId, type CheckResult, type PageData, type SiteData } from "./types.js";
@@ -12,7 +13,7 @@ import { checkRobotsLeak } from "./checks/robots-leak.js";
 import { checkOgImage } from "./checks/og-image.js";
 import { checkDuplicateCanonicals } from "./checks/duplicate-canonicals.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 const HELP_TEXT = `next-seo-doctor v${VERSION}
 
@@ -276,7 +277,8 @@ async function main(): Promise<void> {
 }
 
 const isMainModule =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 
 if (isMainModule) {
   main().catch((err: unknown) => {
