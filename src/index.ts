@@ -13,7 +13,7 @@ import { checkRobotsLeak } from "./checks/robots-leak.js";
 import { checkOgImage } from "./checks/og-image.js";
 import { checkDuplicateCanonicals } from "./checks/duplicate-canonicals.js";
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.2.0";
 
 const HELP_TEXT = `next-seo-doctor v${VERSION}
 

@@ -1,6 +1,6 @@
 {
   "name": "next-seo-doctor",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Post-build SEO validator for Next.js sites — crawls a running site and runs technical SEO checks with a colored terminal report.",
   "type": "module",
   "bin": {
