@@ -1,6 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { parseHtml } from "./utils/html.js";
-import { isLocalhostUrl } from "./utils/html.js";
+import { isLocalhostUrl, swapUrlOrigin } from "./utils/html.js";
 import type { Finding, PageData, SiteData, SitemapEntry } from "./types.js";
 
 const PAGE_TIMEOUT_MS = 10_000;
@@ -183,6 +183,7 @@ async function fetchSitemapRecursive(
   url: string,
   entries: SitemapEntry[],
   seen: Set<string>,
+  mapFetchUrl: (url: string) => string,
 ): Promise<boolean> {
   if (seen.has(url)) return true;
   seen.add(url);
@@ -211,7 +212,7 @@ async function fetchSitemapRecursive(
     for (const child of children) {
       const loc = (child as Record<string, unknown>).loc;
       if (typeof loc === "string") {
-        await fetchSitemapRecursive(loc, entries, seen);
+        await fetchSitemapRecursive(mapFetchUrl(loc), entries, seen, mapFetchUrl);
       }
     }
     return true;
@@ -234,9 +235,12 @@ async function fetchSitemapRecursive(
   return false;
 }
 
-async function fetchSitemap(url: string): Promise<{ entries: SitemapEntry[]; found: boolean }> {
+async function fetchSitemap(
+  url: string,
+  mapFetchUrl: (url: string) => string,
+): Promise<{ entries: SitemapEntry[]; found: boolean }> {
   const entries: SitemapEntry[] = [];
-  const found = await fetchSitemapRecursive(url, entries, new Set());
+  const found = await fetchSitemapRecursive(url, entries, new Set(), mapFetchUrl);
   return { entries, found };
 }
 
@@ -332,11 +336,25 @@ async function fetchPageData(
 export async function crawlSite(baseUrl: string, opts: CrawlOptions): Promise<CrawlResult> {
   const crawlFindings: Finding[] = [];
   const isLocalhost = isLocalhostUrl(baseUrl);
+  const baseOrigin = new URL(baseUrl).origin;
+
+  // When auditing a local server, sitemaps and robots.txt usually carry the
+  // production origin (metadataBase). Fetching those URLs as-is would audit the
+  // deployed site — or fail entirely if it isn't live — so swap the origin for
+  // the local one and test the same paths locally.
+  const remappedOrigins = new Set<string>();
+  const localizeUrl = (url: string): string => {
+    if (!isLocalhost) return url;
+    const swapped = swapUrlOrigin(url, baseOrigin);
+    if (swapped === null) return url;
+    remappedOrigins.add(new URL(url).origin);
+    return swapped;
+  };
 
   const robots = await fetchRobots(baseUrl);
 
-  const sitemapUrl = robots.sitemapUrls[0] ?? new URL("/sitemap.xml", baseUrl).toString();
-  let { entries, found: sitemapFound } = await fetchSitemap(sitemapUrl);
+  const sitemapUrl = localizeUrl(robots.sitemapUrls[0] ?? new URL("/sitemap.xml", baseUrl).toString());
+  let { entries, found: sitemapFound } = await fetchSitemap(sitemapUrl, localizeUrl);
 
   if (!sitemapFound) {
     crawlFindings.push({
@@ -345,6 +363,21 @@ export async function crawlSite(baseUrl: string, opts: CrawlOptions): Promise<Cr
       hint: "add a sitemap so the crawler and search engines can discover all pages",
     });
     entries = [{ url: baseUrl, lastmod: null }];
+  }
+
+  let remappedEntryCount = 0;
+  entries = entries.map((entry) => {
+    const localUrl = localizeUrl(entry.url);
+    if (localUrl === entry.url) return entry;
+    remappedEntryCount++;
+    return { ...entry, url: localUrl };
+  });
+  if (remappedEntryCount > 0) {
+    crawlFindings.push({
+      severity: "info",
+      message: `sitemap URLs point at ${[...remappedOrigins].join(", ")} — remapped ${remappedEntryCount} URL${remappedEntryCount === 1 ? "" : "s"} to ${baseUrl} for local testing`,
+      hint: "expected when metadataBase is your production domain; the same paths are tested on the local server",
+    });
   }
 
   let deduped = dedupeEntries(entries);
@@ -406,6 +439,7 @@ export async function crawlSite(baseUrl: string, opts: CrawlOptions): Promise<Cr
     cappedAt,
     crawlFindings,
     isLocalhost,
+    remappedOrigins: [...remappedOrigins],
   };
 
   if (failureRatio > 0.5) {

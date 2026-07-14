@@ -26,6 +26,7 @@ export function makeSite(overrides: Partial<SiteData> = {}): SiteData {
     cappedAt: null,
     crawlFindings: [],
     isLocalhost: true,
+    remappedOrigins: [],
     ...overrides,
   };
 }

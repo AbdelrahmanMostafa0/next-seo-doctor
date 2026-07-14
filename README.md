@@ -11,6 +11,12 @@ npx next-seo-doctor http://localhost:3000
 
 That's it — no config file, one positional argument. Exit code is `0` when clean and `1` when it finds SEO errors, so it works as a CI gate for free.
 
+### Localhost runs
+
+Your sitemap, robots.txt, and og:image URLs usually carry the production origin (from `metadataBase`) even when the site runs locally. When the URL you pass is localhost (any port — also `127.0.0.1`, `0.0.0.0`, `*.localhost`), the crawler swaps that production origin for your local one and tests the same paths against the local server — it never silently audits the deployed site, and it works before you've deployed at all. The swap is reported as an info finding; URLs on unrelated origins (CDNs, external hosts) are fetched as-is.
+
+Canonicals on a single production origin are expected on localhost: as long as each page's canonical path self-references, the pages count as ok and the origin is reported once as an info line (mixed origins or wrong paths still warn). Full canonical validation runs when you point the tool at the production URL.
+
 ```sh
 next-seo-doctor <url> [options]
 ```

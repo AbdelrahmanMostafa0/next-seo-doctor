@@ -169,7 +169,7 @@ async function runCheck(id: CheckId, pages: PageData[], site: SiteData): Promise
     case "robots-leak":
       return checkRobotsLeak(site);
     case "og-image":
-      return checkOgImage(pages);
+      return checkOgImage(pages, site);
     case "duplicate-canonicals":
       return checkDuplicateCanonicals(pages);
   }

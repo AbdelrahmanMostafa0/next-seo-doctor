@@ -1,5 +1,6 @@
-import type { CheckResult, Finding, PageData } from "../types.js";
+import type { CheckResult, Finding, PageData, SiteData } from "../types.js";
 import { readImageDimensions } from "../utils/image-dimensions.js";
+import { swapUrlOrigin } from "../utils/html.js";
 
 const EXPECTED_WIDTH = 1200;
 const EXPECTED_HEIGHT = 630;
@@ -30,11 +31,31 @@ async function fetchImage(url: string): Promise<ImageFetchResult> {
   }
 }
 
-export async function checkOgImage(pages: PageData[]): Promise<CheckResult> {
+export async function checkOgImage(pages: PageData[], site: SiteData): Promise<CheckResult> {
   const findings: Finding[] = [];
   const candidates = pages.filter((p) => p.ok && !p.failed && !p.skipped);
   const cache = new Map<string, Promise<ImageFetchResult>>();
+  const baseOrigin = new URL(site.baseUrl).origin;
   let ok = 0;
+
+  // On a localhost crawl, the site's production origin shows up in URLs the app
+  // builds from metadataBase. The sitemap may already use localhost (env-based
+  // base URL), so the crawl-time remap list alone can miss it — canonical
+  // origins reveal it too. og:image URLs on any of these origins are fetched
+  // from the local server; unrelated origins (CDNs, external hosts) are not.
+  const siteOrigins = new Set(site.remappedOrigins);
+  if (site.isLocalhost) {
+    for (const page of candidates) {
+      if (!page.canonical) continue;
+      try {
+        const origin = new URL(page.canonical).origin;
+        if (origin !== baseOrigin) siteOrigins.add(origin);
+      } catch {
+        // relative or malformed canonical — the canonical check reports it
+      }
+    }
+  }
+  const localizedOrigins = new Set<string>();
 
   for (const page of candidates) {
     if (!page.ogImage) {
@@ -56,6 +77,15 @@ export async function checkOgImage(pages: PageData[]): Promise<CheckResult> {
         message: `${page.finalUrl}: og:image url "${page.ogImage.url}" is not a valid URL`,
       });
       continue;
+    }
+
+    const imageOrigin = new URL(resolvedUrl).origin;
+    if (site.isLocalhost && siteOrigins.has(imageOrigin)) {
+      const swapped = swapUrlOrigin(resolvedUrl, baseOrigin);
+      if (swapped) {
+        resolvedUrl = swapped;
+        localizedOrigins.add(imageOrigin);
+      }
     }
 
     if (!cache.has(resolvedUrl)) {
@@ -84,6 +114,13 @@ export async function checkOgImage(pages: PageData[]): Promise<CheckResult> {
     }
 
     ok++;
+  }
+
+  if (localizedOrigins.size > 0) {
+    findings.push({
+      severity: "info",
+      message: `og:image URLs point at ${[...localizedOrigins].join(", ")} — fetched from ${site.baseUrl} instead for local testing`,
+    });
   }
 
   return {

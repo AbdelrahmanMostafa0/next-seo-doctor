@@ -132,6 +132,93 @@ describe("crawlSite", () => {
     expect(result.pages).toHaveLength(2);
   });
 
+  it("remaps production sitemap URLs to the localhost origin", async () => {
+    const fetchMock = makeFetch({
+      [`${BASE}/sitemap.xml`]: () =>
+        new Response(urlset(["https://prod.example/a", "https://prod.example/b"]), {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        }),
+      [`${BASE}/a`]: () => new Response(html(), { status: 200, headers: { "content-type": "text/html" } }),
+      [`${BASE}/b`]: () => new Response(html(), { status: 200, headers: { "content-type": "text/html" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await crawlSite(BASE, { maxPages: 200, concurrency: 5 });
+
+    expect(result.aborted).toBe(false);
+    expect(result.pages.map((p) => p.url).sort()).toEqual([`${BASE}/a`, `${BASE}/b`]);
+    expect(result.pages.every((p) => p.status === 200)).toBe(true);
+    expect(fetchMock.mock.calls.every(([u]) => String(u).startsWith(BASE))).toBe(true);
+    expect(result.site.remappedOrigins).toEqual(["https://prod.example"]);
+    expect(
+      result.site.crawlFindings.some((f) => f.severity === "info" && f.message.includes("remapped 2 URLs")),
+    ).toBe(true);
+  });
+
+  it("follows a robots.txt sitemap pointer at the production origin from localhost", async () => {
+    const fetchMock = makeFetch({
+      [`${BASE}/robots.txt`]: () =>
+        new Response(`User-agent: *\nSitemap: https://prod.example/sitemap.xml`, { status: 200 }),
+      [`${BASE}/sitemap.xml`]: () =>
+        new Response(urlset(["https://prod.example/a"]), {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        }),
+      [`${BASE}/a`]: () => new Response(html(), { status: 200, headers: { "content-type": "text/html" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await crawlSite(BASE, { maxPages: 200, concurrency: 5 });
+
+    expect(result.site.sitemapFound).toBe(true);
+    expect(result.pages.map((p) => p.url)).toEqual([`${BASE}/a`]);
+    expect(fetchMock.mock.calls.every(([u]) => String(u).startsWith(BASE))).toBe(true);
+  });
+
+  it("remaps sitemapindex child sitemaps that point at the production origin", async () => {
+    const fetchMock = makeFetch({
+      [`${BASE}/sitemap.xml`]: () =>
+        new Response(
+          `<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>https://prod.example/sitemap-a.xml</loc></sitemap></sitemapindex>`,
+          { status: 200, headers: { "content-type": "application/xml" } },
+        ),
+      [`${BASE}/sitemap-a.xml`]: () =>
+        new Response(urlset(["https://prod.example/a"]), {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        }),
+      [`${BASE}/a`]: () => new Response(html(), { status: 200, headers: { "content-type": "text/html" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await crawlSite(BASE, { maxPages: 200, concurrency: 5 });
+
+    expect(result.site.sitemapFound).toBe(true);
+    expect(result.pages.map((p) => p.url)).toEqual([`${BASE}/a`]);
+    expect(fetchMock.mock.calls.every(([u]) => String(u).startsWith(BASE))).toBe(true);
+  });
+
+  it("does not remap sitemap URLs when the crawl target is not localhost", async () => {
+    const STAGING = "https://staging.example";
+    const fetchMock = makeFetch({
+      [`${STAGING}/sitemap.xml`]: () =>
+        new Response(urlset(["https://prod.example/a"]), {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        }),
+      ["https://prod.example/a"]: () =>
+        new Response(html(), { status: 200, headers: { "content-type": "text/html" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await crawlSite(STAGING, { maxPages: 200, concurrency: 5 });
+
+    expect(result.pages.map((p) => p.url)).toEqual(["https://prod.example/a"]);
+    expect(result.site.remappedOrigins).toEqual([]);
+    expect(result.site.crawlFindings.some((f) => f.message.includes("remapped"))).toBe(false);
+  });
+
   it("falls back to crawling the base URL when the sitemap is missing", async () => {
     const fetchMock = makeFetch({
       [BASE]: () => new Response(html(), { status: 200, headers: { "content-type": "text/html" } }),

@@ -70,6 +70,12 @@ export interface SiteData {
   /** Findings for the "crawl" pseudo-section: dead sitemap URLs, missing sitemap, etc. */
   crawlFindings: Finding[];
   isLocalhost: boolean;
+  /**
+   * Non-local origins found in sitemap/robots URLs that were swapped for the local
+   * base origin during a localhost crawl (e.g. the production metadataBase origin).
+   * Empty when the crawl target is not localhost.
+   */
+  remappedOrigins: string[];
 }
 
 export interface ImageDimensions {
